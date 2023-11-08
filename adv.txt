@@ -1,0 +1,259 @@
+
+`timescale 1 ns / 1 ps
+
+
+
+
+module T_FF(T,Q,Clk,Rest);
+	
+	input T,Clk,Rest;
+	output reg Q;
+	
+	always @(posedge Clk or negedge Rest)
+		begin
+			if(Rest == 0)
+				Q = 0;
+			else if (T == 0)
+				Q = Q;
+			else
+				Q = ~Q;
+				
+		end
+		
+endmodule
+
+
+module test_TFF;
+	
+	reg t,c,r;
+	wire q;
+	
+	T_FF T1(t,q,c,r);
+	
+	initial
+		begin
+			
+			r = 0;
+			c = 0;
+			#5 r = ~r;
+			
+			repeat(10)
+			begin
+			 	
+				#10
+				c = ~c;
+				$monitor ("Clk = %d | T = %d | Q = %d ",c,t,q);
+				
+			end
+			
+		end
+		
+		initial
+			begin
+				t = 0;
+				#25 t = ~t;
+			
+			repeat(4)
+			begin
+			 	
+				#20
+				t = ~t;
+				$display ("---------------");
+				
+			end
+		end
+			
+		
+endmodule
+	
+
+
+
+
+module FSM_DET(x,y,Clk,Rest);
+	
+	input x,Clk,Rest;
+	output y;
+	
+	wire A,B,C;
+	
+	wire v1,v2,v3,v4,v5,v6,v7,v8;
+	wire Ta,Tb,Tc;
+	
+	and a1(v1,B,C,x);
+	or o1(Ta,v1,A);
+	
+	
+	and a2(v2,A,~x);
+	and a3(v3,~B,C,~x);
+	and a4(v4,B,~C,~x);
+	and a6(v6,B,C,x);
+	or o2(Tb,v2,v3,v4,v6);
+	
+	and a5(v5,~C,x);
+	and a7(v7,C,~x);
+	and a8(v8,B,x);
+	or o3 (Tc,v5,v7,v8);
+	
+	
+	T_FF t1(Ta,A,Clk,Rest);	
+	T_FF t3(Tb,B,Clk,Rest);
+	T_FF t4(Tc,C,Clk,Rest);
+	
+	buf b1(y,A);
+	
+endmodule
+
+
+
+
+
+module Test_FSM;
+	reg x,c,r;
+	wire y,yh,yr;
+	
+	FSM_DET f1(x,y,c,r);
+	FSM_DET_BeH f2(x,yh,c,r);
+	FSM_DEC_By_REG f3(x,yr,c,r);
+	defparam f3.n = 5;
+	defparam f3.seq = 5'b10110;
+	
+	always @(posedge c)
+		if(y != yh)
+			$display ("There is an erorr!!! where y = %b and yh = %b",y,yh);
+	
+	initial
+		begin
+			r = 0;
+			c = 0;
+			#15 r = ~r;
+			
+			repeat (50)
+			#5 c = ~c;
+			
+		end
+		
+		initial
+			begin
+				x = 0;
+				#12 x = 1;
+				#10 x = 0;
+				#10 x = 1;
+				#10 x = 1;
+				#12 x = 0;
+				#10 x = 1;
+				#10 x = 0;
+				#10 x = 0;
+				#12 x = 1;
+				#10 x = 0;
+				#10 x = 1;
+				#10 x = 1;
+				#12 x = 0;
+				#10 x = 1;
+				#10 x = 1;
+				#10 x = 1;
+				#10 x = 0;
+				#10 x = 1;
+				#10 x = 1;
+				#10 x = 0;
+				
+			end
+			
+		endmodule
+		
+
+
+
+
+
+
+
+module FSM_DET_BeH(x,y,Clk,Rest);
+	
+	input x,Clk,Rest;
+	output reg y;
+	reg [2:0] P,N;
+	
+	parameter S0=3'b000,S1=3'b001,S2=3'b010,S3=3'b011,S4=3'b100;
+	
+	always@(posedge Clk or negedge Rest)
+		
+		if(Rest == 0)
+			P = S0;
+		else
+			P = N;
+			
+	always@(P or x)
+		case(P)
+			S0: if(x) N = S1;
+			S1: if(~x) N = S2;
+			S2: if(x) N = S3;
+				else N = S0;
+			S3: if(x) N = S4;
+				else N = S2;
+			S4: if(x) N = S1;
+				else N = S2;
+			endcase
+			
+	always@(P or x)
+		case (P)
+			S4: y = 1'b1;
+			default: y = 0;
+		endcase
+		
+endmodule
+	
+
+
+			
+	
+	
+	
+module D_FF(D,Q,Clk,Rest);
+	
+	input D,Clk,Rest;
+	output reg Q;
+	wire T;
+	
+	assign T = (~D & Q) | (D & ~Q);
+	
+	T_FF t1(T,Q,Clk,Rest);
+	
+endmodule
+
+	
+	
+	
+
+module FSM_DEC_By_REG(Din,out,Clk,Rest);
+	
+	parameter n = 4,seq = 4'b1011;
+	
+	input Din,Clk,Rest;
+	output reg out;
+	wire [n-1:0] Q;
+	
+	
+	genvar i;
+	assign Q[0] = Din;
+	generate
+	
+	for (i = 0;i<=n-2; i= i+1)
+		begin:
+			
+			regbit D_FF d(Q[i],Q[i+1],Clk,Rest);
+		end
+	endgenerate
+	
+	always@(posedge Clk)
+		if(Q == seq)
+			out = 1;
+		else
+			out = 0;
+			
+endmodule
+		
+	
+	
+	
+	
